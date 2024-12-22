@@ -55,6 +55,13 @@ sh install.sh
   
   ![](./docs/images/volume.png)
 
+- **免费HTTPS证书**
+  
+  默认支持免费https证书，到期前自动续签，无需人工干预。
+
+  ![](./docs/images/freessl.png)
+  
+
 ## 社区
 **微信群**
 
