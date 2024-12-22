@@ -55,4 +55,7 @@ sh install.sh
   
   ![](./docs/images/volume.png)
 
-  
+## 社区
+**微信群**
+
+<img src="./docs/images/wechat_group.png" height="300">
