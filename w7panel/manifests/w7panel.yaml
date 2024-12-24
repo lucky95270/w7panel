@@ -1,0 +1,60 @@
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: w7
+  namespace: default
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: w7
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: w7
+subjects:
+- kind: ServiceAccount
+  name: w7
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: w7
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: w7
+  namespace: default
+  annotations:
+    kubernetes.io/service-account.name: w7
+type: kubernetes.io/service-account-token  
+
+---
+
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: offlineui
+  namespace: kube-system
+spec:
+  chart: https://cdn.w7.cc/w7panel/charts/w7panel-1.0.15.tgz
+  version: v1.0.15
+  targetNamespace: default
+  createNamespace: true
+  set:
+    servicelb.loadBalancerClass: "io.cilium/node"
+    register.needInitUser: "true"

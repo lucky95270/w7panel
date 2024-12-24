@@ -1,0 +1,13 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: cert-manager
+  namespace: kube-system
+spec:
+  chart: https://cdn.w7.cc/w7panel/charts/cert-manager-v1.10.1.tgz
+  version: v1.10.1
+  targetNamespace: cert-manager
+  createNamespace: true
+  set:
+    webhook.enabled: "false"
+    installCRDs: "false"

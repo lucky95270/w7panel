@@ -1,0 +1,94 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: longhorn-iscsi-installation
+  namespace: kube-system
+  labels:
+    app: longhorn-iscsi-installation
+  annotations:
+    command: &cmd OS=$(grep -E "^ID_LIKE=" /etc/os-release | cut -d '=' -f 2); if [[ -z "${OS}" ]]; then OS=$(grep -E "^ID=" /etc/os-release | cut -d '=' -f 2); fi; if [[ "${OS}" == *"debian"* ]]; then sudo apt-get update -q -y && sudo apt-get install -q -y open-iscsi && sudo systemctl -q enable iscsid && sudo systemctl start iscsid && sudo modprobe iscsi_tcp; elif [[ "${OS}" == *"suse"* ]]; then sudo zypper --gpg-auto-import-keys -q refresh && sudo zypper --gpg-auto-import-keys -q install -y open-iscsi && sudo systemctl -q enable iscsid && sudo systemctl start iscsid && sudo modprobe iscsi_tcp; else sudo yum makecache -q -y && sudo yum --setopt=tsflags=noscripts install -q -y iscsi-initiator-utils && echo "InitiatorName=$(/sbin/iscsi-iname)" > /etc/iscsi/initiatorname.iscsi && sudo systemctl -q enable iscsid && sudo systemctl start iscsid && sudo modprobe iscsi_tcp; fi && if [ $? -eq 0 ]; then echo "iscsi install successfully"; else echo "iscsi install failed error code $?"; fi
+spec:
+  selector:
+    matchLabels:
+      app: longhorn-iscsi-installation
+  template:
+    metadata:
+      labels:
+        app: longhorn-iscsi-installation
+    spec:
+      hostNetwork: true
+      hostPID: true
+      initContainers:
+      - name: iscsi-installation
+        command:
+          - nsenter
+          - --mount=/proc/1/ns/mnt
+          - --
+          - bash
+          - -c
+          - *cmd
+        image: busybox:latest
+        securityContext:
+          privileged: true
+      containers:
+      - name: sleep
+        image: registry.k8s.io/pause:3.1
+  updateStrategy:
+    type: RollingUpdate
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: longhorn-nfs-installation
+  namespace: kube-system
+  labels:
+    app: longhorn-nfs-installation
+  annotations:
+    command: &cmd OS=$(grep -E "^ID_LIKE=" /etc/os-release | cut -d '=' -f 2); if [[ -z "${OS}" ]]; then OS=$(grep -E "^ID=" /etc/os-release | cut -d '=' -f 2); fi; echo "Detected OS ${OS}"; if [[ "${OS}" == *"debian"* ]]; then sudo apt-get update -q -y && sudo apt-get install -q -y nfs-common && if [ $? -eq 0 ]; then echo "NFS install successfully"; else echo "NFS install failed error code $?"; fi; elif [[ "${OS}" == *"suse"* ]]; then sudo zypper --gpg-auto-import-keys -q refresh && sudo zypper --gpg-auto-import-keys -q install -y nfs-client && if [ $? -eq 0 ]; then echo "NFS install successfully"; else echo "NFS install failed error code $?"; fi; elif [[ "${OS}" == *"centos"* || "${OS}" == *"rhel"* ]]; then sudo yum makecache -q -y && sudo yum --setopt=tsflags=noscripts install -q -y nfs-utils && if [ $? -eq 0 ]; then echo "NFS install successfully"; else echo "NFS install failed error code $?"; fi; else echo "Unrecognized OS, unable to install NFS client."; fi
+spec:
+  selector:
+    matchLabels:
+      app: longhorn-nfs-installation
+  template:
+    metadata:
+      labels:
+        app: longhorn-nfs-installation
+    spec:
+      hostNetwork: true
+      hostPID: true
+      initContainers:
+      - name: nfs-installation
+        command:
+          - nsenter
+          - --mount=/proc/1/ns/mnt
+          - --
+          - bash
+          - -c
+          - *cmd
+        image: busybox:latest
+        securityContext:
+          privileged: true
+      containers:
+      - name: sleep
+        image: registry.k8s.io/pause:3.1
+  updateStrategy:
+    type: RollingUpdate
+---
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: longhorn
+  namespace: kube-system
+spec:
+  chart: https://cdn.w7.cc/w7panel/charts/longhorn-1.7.2.tgz
+  version: v1.7.2
+  targetNamespace: longhorn-system
+  createNamespace: true
+  set:
+    longhornUI.replicas: 0
+    csi.attacherReplicaCount: 1
+    csi.provisionerReplicaCount: 1
+    csi.resizerReplicaCount: 1
+    csi.snapshotterReplicaCount: 1
+    defaultSettings.storageReservedPercentageForDefaultDisk: "0"
