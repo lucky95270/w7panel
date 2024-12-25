@@ -92,7 +92,7 @@ downloadResource() {
 	download_files 'https://cdn.w7.cc/w7panel/manifests/cilium.yaml'
 	download_files 'https://cdn.w7.cc/w7panel/manifests/higress.yaml'
 	download_files 'https://cdn.w7.cc/w7panel/manifests/longhorn.yaml'
-	download_files 'https://cdn.w7.cc/w7panel/manifests/w7panel.yaml'
+	download_files 'https://cdn.w7.cc/w7panel/manifests/w7panel-offline.yaml'
 
 	# etc
 	download_files 'https://cdn.w7.cc/w7panel/etc/registries.yaml'
@@ -202,20 +202,19 @@ installHelmCharts() {
 
 # Install k3s
 k3sInstall() {
-   info "current server's public network ip: $(publicNetworkIp)"
-   curl -sfL https://rancher-mirror.rancher.cn/k3s/k3s-install.sh | K3S_KUBECONFIG_MODE='644' INSTALL_K3S_SKIP_SELINUX_RPM=true INSTALL_K3S_SELINUX_WARN=true INSTALL_K3S_MIRROR=cn INSTALL_K3S_MIRROR_URL=rancher-mirror.rancher.cn \
-   sh -s - --write-kubeconfig-mode 644 \
-   --tls-san "$(publicNetworkIp)" \
-   --advertise-address "$(publicNetworkIp)" \
-   --system-default-registry "registry.cn-hangzhou.aliyuncs.com" \
-   --kubelet-arg="image-gc-high-threshold=70" \
-   --kubelet-arg="image-gc-low-threshold=60" \
-   --node-label "w7.public-ip=$(publicNetworkIp)" \
-   --embedded-registry \
-   --flannel-backend "none" \
-   --disable-network-policy \
-   --disable-kube-proxy \
-   --disable "local-storage,traefik"
+	info "current server's public network ip: $(publicNetworkIp)"
+	curl -sfL https://rancher-mirror.rancher.cn/k3s/k3s-install.sh | K3S_KUBECONFIG_MODE='644' INSTALL_K3S_SKIP_SELINUX_RPM=true INSTALL_K3S_SELINUX_WARN=true INSTALL_K3S_MIRROR=cn INSTALL_K3S_MIRROR_URL=rancher-mirror.rancher.cn \
+	sh -s - --write-kubeconfig-mode 644 \
+			--tls-san "$(internalIP)" \
+			--system-default-registry "registry.cn-hangzhou.aliyuncs.com" \
+			--kubelet-arg="image-gc-high-threshold=70" \
+			--kubelet-arg="image-gc-low-threshold=60" \
+			--node-label "w7.public-ip=$(publicNetworkIp)" \
+			--embedded-registry \
+			--flannel-backend "none" \
+			--disable-network-policy \
+			--disable-kube-proxy \
+			--disable "local-storage,traefik"
 }
 
 {
@@ -232,7 +231,8 @@ k3sInstall() {
 	checkW7panelInstalled
 	
 	echo -e "\n=================================================================="
-	echo -e "\033[32m后台地址: http://$(publicNetworkIp):9090\033[0m"
+	echo -e "\033[32m内网地址: http://$(internalIP):9090\033[0m"
+	echo -e "\033[32m公网地址: http://$(publicNetworkIp):9090\033[0m"
 	echo -e "\033[32m微擎面板安装成功，请访问后台设置登录密码！\033[0m"
 	echo -e ""
 	echo -e "\033[31mwarning:\033[0m"
