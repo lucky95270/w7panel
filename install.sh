@@ -65,7 +65,7 @@ download_files() {
 		return 0
 	fi
 	
-	curl -L --insecure --output "${path}" "$url"
+	curl -L --insecure --output "${path}" "$url" >/dev/null 2>&1
 	
 	if [ $? -eq 0 ]; then
 		info "download success ${path}"
@@ -82,12 +82,12 @@ downloadResource() {
 	# images
 	download_files 'https://cdn.w7.cc/w7panel/images/cilium.cilium-v1.16.4.tar'
 	download_files 'https://cdn.w7.cc/w7panel/images/cilium.operator-generic-v1.16.4.tar'
-	download_files 'https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-cainjector-v1.10.1.tar'
-	download_files 'https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-controller-v1.10.1.tar'
-	download_files 'https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-webhook-v1.10.1.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-cainjector-v1.16.2.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-controller-v1.16.2.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-webhook-v1.16.2.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-startupapicheck-v1.16.2.tar'
 	
 	# manifests
-	download_files 'https://cdn.w7.cc/w7panel/manifests/cert-manager.crds+clusterIssuer.yaml'
 	download_files 'https://cdn.w7.cc/w7panel/manifests/cert-manager.yaml'
 	download_files 'https://cdn.w7.cc/w7panel/manifests/cilium.yaml'
 	download_files 'https://cdn.w7.cc/w7panel/manifests/higress.yaml'
@@ -171,6 +171,7 @@ checkW7panelInstalled() {
 }
 
 importImages() {
+	info "开始导入核心组件镜像"
 	IMAGES_DIR="./w7panel/images"
 	if [ ! -d "$IMAGES_DIR" ]; then
 		return 0
@@ -178,8 +179,7 @@ importImages() {
 
 	for IMAGE_FILE in "$IMAGES_DIR"/*.tar; do
 		if [ -f "$IMAGE_FILE" ]; then
-			info "正在导入镜像: $IMAGE_FILE"
-			k3s ctr -n=k8s.io images import "$IMAGE_FILE"
+			k3s ctr -n=k8s.io images import "$IMAGE_FILE" >/dev/null 2>&1
 
 			if [ $? -eq 0 ]; then
 				info "镜像导入成功: $IMAGE_FILE"
