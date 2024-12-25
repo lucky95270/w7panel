@@ -205,16 +205,16 @@ k3sInstall() {
 	info "current server's public network ip: $(publicNetworkIp)"
 	curl -sfL https://rancher-mirror.rancher.cn/k3s/k3s-install.sh | K3S_KUBECONFIG_MODE='644' INSTALL_K3S_SKIP_SELINUX_RPM=true INSTALL_K3S_SELINUX_WARN=true INSTALL_K3S_MIRROR=cn INSTALL_K3S_MIRROR_URL=rancher-mirror.rancher.cn \
 	sh -s - --write-kubeconfig-mode 644 \
-			--tls-san "$(internalIP)" \
-			--system-default-registry "registry.cn-hangzhou.aliyuncs.com" \
-			--kubelet-arg="image-gc-high-threshold=70" \
-			--kubelet-arg="image-gc-low-threshold=60" \
-			--node-label "w7.public-ip=$(publicNetworkIp)" \
-			--embedded-registry \
-			--flannel-backend "none" \
-			--disable-network-policy \
-			--disable-kube-proxy \
-			--disable "local-storage,traefik"
+		--tls-san "$(internalIP)" \
+		--system-default-registry "registry.cn-hangzhou.aliyuncs.com" \
+		--kubelet-arg="image-gc-high-threshold=70" \
+		--kubelet-arg="image-gc-low-threshold=60" \
+		--node-label "w7.public-ip=$(publicNetworkIp)" \
+		--embedded-registry \
+		--flannel-backend "none" \
+		--disable-network-policy \
+		--disable-kube-proxy \
+		--disable "local-storage,traefik"
 }
 
 {
