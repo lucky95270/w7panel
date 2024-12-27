@@ -26,6 +26,12 @@ sh install.sh
   PUBLIC_IP=123.123.123.123 sh install.sh
   ```
 
+- 如果忘记密码，管理员可在master服务器执行命令来重置密码，`--username`传新管理员名，`--password`传新密码，示例：
+  
+  ```bash
+  kubectl exec -it $(kubectl get pods -n default -l app=w7panel-offline | awk 'NR>1{print $1}') -- ko-app/k8s-offline auth:register --username=admin --password=123456
+  ```
+
 ## 核心优势
 - **生产等级**
   
