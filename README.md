@@ -23,6 +23,8 @@ sh install.sh
 - [应用管理](./docs/apps/index.md)
   - [创建应用](./docs/apps/createapp.md)
   - [应用商店](./docs/apps/createapp-appstore.md)
+  - [域名管理](./docs/apps/domains.md)
+  - [文件管理](./docs/apps/files.md)
 
 ## 常见问题
 - 如果出网使用了NAT网关，会导致获取公网IP不正确，安装时可赋值环境变量`PUBLIC_IP`来解决，示例：
