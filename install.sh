@@ -79,14 +79,26 @@ download_files() {
 downloadResource() {
 	info "start download w7panel resource!"
 
-	# images
+	# images cilium
 	download_files 'https://cdn.w7.cc/w7panel/images/cilium.cilium-v1.16.4.tar'
 	download_files 'https://cdn.w7.cc/w7panel/images/cilium.operator-generic-v1.16.4.tar'
+	# images cert-manager
 	download_files 'https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-cainjector-v1.16.2.tar'
 	download_files 'https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-controller-v1.16.2.tar'
 	download_files 'https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-webhook-v1.16.2.tar'
 	download_files 'https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-startupapicheck-v1.16.2.tar'
-	
+	# images longhorn
+	download_files 'https://cdn.w7.cc/w7panel/images/longhornio.csi-attacher-v4.7.0.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/longhornio.csi-node-driver-registrar-v2.12.0.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/longhornio.csi-provisioner-v4.0.1-20241007.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/longhornio.csi-resizer-v1.12.0.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/longhornio.csi-snapshotter-v7.0.2-20241007.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/longhornio.livenessprobe-v2.14.0.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/longhornio.longhorn-engine-v1.7.2.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/longhornio.longhorn-instance-manager-v1.7.2.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/longhornio.longhorn-manager-v1.7.2.tar'
+	download_files 'https://cdn.w7.cc/w7panel/images/longhornio.longhorn-share-manager-v1.7.2.tar'
+ 
 	# manifests
 	download_files 'https://cdn.w7.cc/w7panel/manifests/cert-manager.yaml'
 	download_files 'https://cdn.w7.cc/w7panel/manifests/cilium.yaml'
