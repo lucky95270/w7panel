@@ -209,13 +209,13 @@ installHelmCharts() {
 	M_PATH="/var/lib/rancher/k3s/server/manifests/"
 	mkdir -p $M_PATH $C_PATH
 	
-	cp -r "./w7panel/manifests/." $M_PATH
+	cp -r "./w7panel/manifests/*" $M_PATH
 }
 
 # Install k3s
 k3sInstall() {
 	info "current server's public network ip: $(publicNetworkIp)"
-	curl -sfL https://rancher-mirror.rancher.cn/k3s/k3s-install.sh | K3S_KUBECONFIG_MODE='644' INSTALL_K3S_SKIP_SELINUX_RPM=true INSTALL_K3S_SELINUX_WARN=true INSTALL_K3S_MIRROR=cn INSTALL_K3S_MIRROR_URL=rancher-mirror.rancher.cn \
+	curl -sfL https://rancher-mirror.rancher.cn/k3s/k3s-install.sh | K3S_NODE_NAME=server1 K3S_KUBECONFIG_MODE='644' INSTALL_K3S_SKIP_SELINUX_RPM=true INSTALL_K3S_SELINUX_WARN=true INSTALL_K3S_MIRROR=cn INSTALL_K3S_MIRROR_URL=rancher-mirror.rancher.cn \
 	sh -s - --write-kubeconfig-mode 644 \
 		--tls-san "$(internalIP)" \
 		--system-default-registry "registry.cn-hangzhou.aliyuncs.com" \
