@@ -209,7 +209,7 @@ installHelmCharts() {
 	M_PATH="/var/lib/rancher/k3s/server/manifests/"
 	mkdir -p $M_PATH $C_PATH
 	
-	cp -r "./w7panel/manifests/*" $M_PATH
+	cp -r "./w7panel/manifests/" $M_PATH
 }
 
 # Install k3s
