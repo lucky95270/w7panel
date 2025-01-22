@@ -183,7 +183,7 @@ checkW7panelInstalled() {
 }
 
 importImages() {
-	info "开始导入核心组件镜像"
+	info "正在导入核心组件镜像，请耐心等待..."
 	IMAGES_DIR="./w7panel/images"
 	if [ ! -d "$IMAGES_DIR" ]; then
 		return 0
