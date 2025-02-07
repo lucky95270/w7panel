@@ -39,6 +39,15 @@ sh install.sh
   kubectl exec -it $(kubectl get pods -n default -l app=w7panel-offline | awk 'NR>1{print $1}') -- ko-app/k8s-offline auth:register --username=admin --password=123456
   ```
 
+- 阿里云服务器可能会因为安装阿里云盾导致微擎面板启动失败，解决方案如下：
+  
+  1）一般云服务器，可在重做系统时勾选关闭安全加固，也可通过通过命令卸载阿里云盾。
+  
+  2）轻量应用服务器，可在阿里云控制台->云安全中心->功能设置->客户端，找到您的服务器后，执行卸载操作。
+  
+  其他问题详见阿里云官方文档：https://help.aliyun.com/zh/security-center/user-guide/uninstall-the-security-center-agent
+  
+
 ## 核心优势
 - **生产等级**
   
