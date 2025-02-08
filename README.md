@@ -47,6 +47,11 @@ sh install.sh
   
   其他问题详见阿里云官方文档：https://help.aliyun.com/zh/security-center/user-guide/uninstall-the-security-center-agent
   
+- 公网IP和内网IP暂时不支持IPv6，否则可能会造成网络组件安装错误，安装前请关闭IPv6，使用IPv4。也可赋值环境变量`PUBLIC_IP`（公网IP）、`INTERNAL_IP`（内网IP）来解决，示例：
+  
+  ```bash
+  PUBLIC_IP=123.123.123.123 INTERNAL_IP=123.123.123.123 sh install.sh
+  ```
 
 ## 核心优势
 - **生产等级**
