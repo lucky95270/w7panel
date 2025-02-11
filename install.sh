@@ -125,7 +125,16 @@ publicNetworkIp() {
 
 internalIP() {
 	if [ -z "$INTERNAL_IP" ]; then
-		INTERNAL=$(ip addr show eth0 | grep 'inet ' | grep -v '127.0.0.1' | awk '{ print $2 }' | cut -d/ -f1);
+		# 遍历所有网络接口
+		for interface in $(ip -o link show | awk -F': ' '{print $2}'); do
+			# 排除回环接口
+			if [ "$interface" != "lo" ]; then
+				INTERNAL=$(ip addr show "$interface" | grep 'inet ' | grep -v '127.0.0.1' | awk '{ print $2 }' | cut -d/ -f1)
+				if [ -n "$INTERNAL" ]; then
+					break
+				fi
+			fi
+		done
 		echo $INTERNAL
 	else
 		echo $INTERNAL
