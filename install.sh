@@ -137,7 +137,7 @@ internalIP() {
 		done
 		echo $INTERNAL
 	else
-		echo $INTERNAL
+		echo $INTERNAL_IP
 	fi
 }
 
