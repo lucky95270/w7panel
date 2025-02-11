@@ -1,23 +1,45 @@
 #!/bin/bash
 set -e
 
-# --- helper functions for logs ---
-# 输出信息日志
-info() {
-    echo '[INFO] ' "$@"
-}
-
-# 输出警告日志
-warn() {
-    RED='\033[0;31m'
+# 检查终端是否支持颜色输出
+if [ -t 1 ]; then
+    INFO_COLOR='\033[0m'
+    WARN_COLOR='\033[33m'
+    ERROR_COLOR='\033[31m'
+    SUCCESS_COLOR='\033[32m'
     NC='\033[0m' # No Color
-    echo -e "${RED}[WARN] ${NC}" "${RED}$@${NC}" >&2
+else
+    INFO_COLOR=''
+    WARN_COLOR=''
+    ERROR_COLOR=''
+    SUCCESS_COLOR=''
+    NC=''
+fi
+
+# 信息日志
+info() {
+    printf "${INFO_COLOR}[INFO]${NC} %s\n" "$*"
 }
 
-# 输出错误日志并退出
+# 警告日志
+warn() {
+    printf "${WARN_COLOR}[WARN] %s${NC}\n" "$*" >&2
+}
+
+# 成功日志
+success() {
+    printf "${SUCCESS_COLOR}[SUCCESS]${NC} %s\n" "$*"
+}
+
+# 错误日志
 fatal() {
-    echo '[ERROR] ' "$@" >&2
+    printf "${ERROR_COLOR}[ERROR] %s${NC}\n" "$*" >&2
     exit 1
+}
+
+# 提示日志
+tips() {
+    printf "${SUCCESS_COLOR}%s${NC}\n" "$*"
 }
 
 # --- add quotes to command arguments ---
@@ -54,83 +76,107 @@ process_args() {
     eval set -- $(escape "$@") $(quote "$@")
 }
 
+# 进度条函数
+show_progress() {
+    local pid=$1
+    local delay=0.75
+    local spinstr='|/-\'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf "${WARN_COLOR} [%c]  ${NC}" "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
 # 下载文件函数
 download_files() {
-    # 检查参数数量
-    if [ "$#" -ne 1 ]; then
-        fatal "Usage: download_files <URL>"
-        return 1
-    fi
-
     local url=$1
-    # 生成保存路径
     local path=".$(echo "$url" | sed -E 's|^https?://[^/]+||')"
     local save_path=$(dirname "$path")
-
-    # 创建保存目录
-    if [ ! -d "$save_path" ]; then
-        mkdir -p "$save_path" || {
-            fatal "Failed to create directory: $save_path"
-            return 1
-        }
-    fi
-
-    # 检查文件是否已存在
+    local filename=$(basename "$path")
+    mkdir -p "$save_path" || fatal "创建目录失败: $save_path"
+    
     if [ -f "$path" ]; then
-        info "File already exists, skipping download: ${path}"
+        info "文件已存在: ${path}"
         return 0
     fi
 
-    # 下载文件
-    curl -L --insecure --output "${path}" "$url" >/dev/null 2>&1
-    local status=$?
-    if [ $status -eq 0 ]; then
-        info "download success ${path}"
-    else
-        info "download failed"
-        return 2
-    fi
+    printf "${INFO_COLOR}[INFO]${NC} 开始下载: %s [ ] 0%%\r" "$filename"
+    (
+        stdbuf -oL curl -# -L --insecure -o "$path" "$url" 2>&1 || {
+            rm -f "$path"
+            printf "\r${ERROR_COLOR}[ERROR] 下载失败: %s${NC}" "$url"
+        }
+    ) | awk -v info_color="${INFO_COLOR}" -v success_color="${SUCCESS_COLOR}" -v nc="${NC}" -v filename="${filename}" '
+        BEGIN {
+            RS="\r"
+            max = 50
+            percent = 0
+            fflush()
+        }
+        {
+            if (match($0, /([0-9]+)\.?[0-9]*%/, parts)) {
+                new_percent = parts[1] + 0
+                if (new_percent != percent) {
+                    percent = new_percent
+                    progress = int(percent * max / 100)
+                    filled = ""
+                    for (i = 0; i < progress; i++) {
+                        filled = filled "#"
+                    }
+                    empty = ""
+                    for (i = 0; i < max - progress; i++) {
+                        empty = empty " "
+                    }
+                    printf "\r%s[INFO]%s 下载中: %s [%s%s] %d%%", info_color, nc, filename, filled, empty, percent
+                    fflush()
+                }
+            }
+        }
+        END {
+            filled = ""
+            for (i = 0; i < max; i++) {
+                filled = filled "#"
+            }
+            printf "\r%s[INFO]%s 下载完成: %s [%s] %s100%%%s\n", info_color, nc, filename, filled, success_color, nc
+        }
+    '
 }
 
-# 下载资源函数
+# 载资源函数
 downloadResource() {
-    info "start download w7panel resource!"
+    info "开始下载微擎面板资源..."
+    local resources="
+        https://cdn.w7.cc/w7panel/images/cilium.cilium-v1.16.4.tar
+        https://cdn.w7.cc/w7panel/images/cilium.operator-generic-v1.16.4.tar
+        https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-cainjector-v1.16.2.tar
+        https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-controller-v1.16.2.tar
+        https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-webhook-v1.16.2.tar
+        https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-startupapicheck-v1.16.2.tar
+        https://cdn.w7.cc/w7panel/images/longhornio.csi-attacher-v4.7.0.tar
+        https://cdn.w7.cc/w7panel/images/longhornio.csi-node-driver-registrar-v2.12.0.tar
+        https://cdn.w7.cc/w7panel/images/longhornio.csi-provisioner-v4.0.1-20241007.tar
+        https://cdn.w7.cc/w7panel/images/longhornio.csi-resizer-v1.12.0.tar
+        https://cdn.w7.cc/w7panel/images/longhornio.csi-snapshotter-v7.0.2-20241007.tar
+        https://cdn.w7.cc/w7panel/images/longhornio.livenessprobe-v2.14.0.tar
+        https://cdn.w7.cc/w7panel/images/longhornio.longhorn-engine-v1.7.2.tar
+        https://cdn.w7.cc/w7panel/images/longhornio.longhorn-instance-manager-v1.7.2.tar
+        https://cdn.w7.cc/w7panel/images/longhornio.longhorn-manager-v1.7.2.tar
+        https://cdn.w7.cc/w7panel/images/longhornio.longhorn-share-manager-v1.7.2.tar
+        https://cdn.w7.cc/w7panel/manifests/cert-manager.yaml
+        https://cdn.w7.cc/w7panel/manifests/cilium.yaml
+        https://cdn.w7.cc/w7panel/manifests/higress.yaml
+        https://cdn.w7.cc/w7panel/manifests/longhorn.yaml
+        https://cdn.w7.cc/w7panel/manifests/w7panel-offline.yaml
+        https://cdn.w7.cc/w7panel/etc/registries.yaml
+        https://cdn.w7.cc/w7panel/etc/sysctl.d/k3s.conf
+        https://cdn.w7.cc/w7panel/etc/k3s.service.d/override.conf
+    "
 
-    # 定义资源数组
-    local resources=(
-        # images cilium
-        "https://cdn.w7.cc/w7panel/images/cilium.cilium-v1.16.4.tar"
-        "https://cdn.w7.cc/w7panel/images/cilium.operator-generic-v1.16.4.tar"
-        # images cert-manager
-        "https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-cainjector-v1.16.2.tar"
-        "https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-controller-v1.16.2.tar"
-        "https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-webhook-v1.16.2.tar"
-        "https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-startupapicheck-v1.16.2.tar"
-        # images longhorn
-        "https://cdn.w7.cc/w7panel/images/longhornio.csi-attacher-v4.7.0.tar"
-        "https://cdn.w7.cc/w7panel/images/longhornio.csi-node-driver-registrar-v2.12.0.tar"
-        "https://cdn.w7.cc/w7panel/images/longhornio.csi-provisioner-v4.0.1-20241007.tar"
-        "https://cdn.w7.cc/w7panel/images/longhornio.csi-resizer-v1.12.0.tar"
-        "https://cdn.w7.cc/w7panel/images/longhornio.csi-snapshotter-v7.0.2-20241007.tar"
-        "https://cdn.w7.cc/w7panel/images/longhornio.livenessprobe-v2.14.0.tar"
-        "https://cdn.w7.cc/w7panel/images/longhornio.longhorn-engine-v1.7.2.tar"
-        "https://cdn.w7.cc/w7panel/images/longhornio.longhorn-instance-manager-v1.7.2.tar"
-        "https://cdn.w7.cc/w7panel/images/longhornio.longhorn-manager-v1.7.2.tar"
-        "https://cdn.w7.cc/w7panel/images/longhornio.longhorn-share-manager-v1.7.2.tar"
-        # manifests
-        "https://cdn.w7.cc/w7panel/manifests/cert-manager.yaml"
-        "https://cdn.w7.cc/w7panel/manifests/cilium.yaml"
-        "https://cdn.w7.cc/w7panel/manifests/higress.yaml"
-        "https://cdn.w7.cc/w7panel/manifests/longhorn.yaml"
-        "https://cdn.w7.cc/w7panel/manifests/w7panel-offline.yaml"
-        # etc
-        "https://cdn.w7.cc/w7panel/etc/registries.yaml"
-        "https://cdn.w7.cc/w7panel/etc/sysctl.d/k3s.conf"
-        "https://cdn.w7.cc/w7panel/etc/k3s.service.d/override.conf"
-    )
-
-    # 遍历资源数组进行下载
-    for resource in "${resources[@]}"; do
+    for resource in $resources; do
         download_files "$resource"
     done
 }
@@ -146,20 +192,18 @@ publicNetworkIp() {
     fi
 }
 
-# 获取内网IP
+# 获取内网IP（兼容多系统）
 internalIP() {
     if [ -z "$INTERNAL_IP" ]; then
-        # 遍历所有网络接口
-        for interface in $(ip -o link show | awk -F': ' '{print $2}'); do
-            # 排除回环接口
-            if [ "$interface" != "lo" ]; then
-                INTERNAL=$(ip addr show "$interface" | grep 'inet ' | grep -v '127.0.0.1' | awk '{ print $2 }' | cut -d/ -f1)
-                if [ -n "$INTERNAL" ]; then
-                    break
-                fi
-            fi
-        done
-        echo "$INTERNAL"
+        INTERNAL_IP=$(
+            ip -o -4 addr show | \
+            awk '{print $4}' | \
+            grep -v '127.0.0.1' | \
+            cut -d/ -f1 | \
+            head -1
+        )
+        [ -z "$INTERNAL_IP" ] && INTERNAL_IP=$(hostname -I | awk '{print $1}')
+        echo "$INTERNAL_IP"
     else
         echo "$INTERNAL_IP"
     fi
@@ -222,43 +266,31 @@ checkK3SInstalled() {
 
 # 检查微擎面板是否安装成功
 checkW7panelInstalled() {
-    info '微擎面板正在安装中，请耐心等待'
-    local max_attempts=300
-    local attempt=0
-    while [ $attempt -lt $max_attempts ]; do
-        local response=$(curl -s --max-time 5 -I "http://$(internalIP):9090")
-        local status=$?
-        if [ $status -eq 0 ]; then
-            if echo "$response" | grep -q "HTTP/"; then
-                break
-            fi
-        fi
-        echo -n "."
-        sleep 3
-        attempt=$((attempt + 1))
+    printf "${INFO_COLOR}[INFO]${NC} %s" "正在启动微擎面板，请稍候..."
+    local spinpid
+    while true; do
+        curl -s --max-time 2 -I "http://$(internalIP):9090" | grep -q "HTTP/" && break
+        sleep 1 &
+        show_progress $! &
+        spinpid=$!
+        wait $spinpid
     done
+    echo
 }
 
 # 导入镜像
 importImages() {
-    info "正在导入核心组件镜像，请耐心等待..."
     local IMAGES_DIR="./w7panel/images"
-    if [ ! -d "$IMAGES_DIR" ]; then
-        return 0
-    fi
+    [ ! -d "$IMAGES_DIR" ] && return 0
 
-    for IMAGE_FILE in "$IMAGES_DIR"/*.tar; do
-        if [ -f "$IMAGE_FILE" ]; then
-            k3s ctr -n=k8s.io images import "$IMAGE_FILE" >/dev/null 2>&1
-            local import_status=$?
-            if [ $import_status -eq 0 ]; then
-                info "镜像导入成功: $IMAGE_FILE"
-            else
-                info "镜像导入失败: $IMAGE_FILE"
-            fi
-        else
-            info "不是文件: $IMAGE_FILE"
-        fi
+    local total=$(ls $IMAGES_DIR/*.tar 2>/dev/null | wc -l)
+    local count=0
+    for IMAGE_FILE in $IMAGES_DIR/*.tar; do
+        count=$((count+1))
+        info "导入镜像中 [$count/$total] $(basename $IMAGE_FILE)"
+        k3s ctr -n=k8s.io images import "$IMAGE_FILE" >/dev/null 2>&1 || {
+            warn "镜像导入失败: $(basename $IMAGE_FILE)"
+        }
     done
 }
 
@@ -277,7 +309,7 @@ installHelmCharts() {
 k3sInstall() {
     info "current server's public network ip: $(publicNetworkIp)"
     curl -sfL https://rancher-mirror.rancher.cn/k3s/k3s-install.sh | \
-    K3S_NODE_NAME=server1 K3S_KUBECONFIG_MODE='644' INSTALL_K3S_SKIP_SELINUX_RPM=true INSTALL_K3S_SELINUX_WARN=true INSTALL_K3S_MIRROR=cn INSTALL_K3S_MIRROR_URL=rancher-mirror.rancher.cn \
+    K3S_NODE_NAME=server1 K3S_KUBECONFIG_MODE='644' INSTALL_K3S_SKIP_SELINUX_RPM=true INSTALL_K3S_SELINUX_WARN=true INSTALL_K3S_MIRROR=cn INSTALL_K3S_MIRROR_URL=rancher-mirror.cdn.w7.cc \
     sh -s - --write-kubeconfig-mode 644 \
         --tls-san "$(internalIP)" \
         --system-default-registry "registry.cn-hangzhou.aliyuncs.com" \
@@ -291,10 +323,17 @@ k3sInstall() {
         --disable "local-storage,traefik"
 }
 
+# 系统检查
+checkDependencies() {
+    command -v curl >/dev/null || fatal "请先安装 curl"
+    command -v ip >/dev/null || fatal "需要 iproute2 工具包"
+}
+
 # 主执行函数
 main() {
     process_args "$@"
 
+    checkDependencies
     checkK3SInstalled
     downloadResource
 
@@ -307,15 +346,14 @@ main() {
     installHelmCharts
     checkW7panelInstalled
 
-    echo -e "\n=================================================================="
-    echo -e "\033[32m内网地址: http://$(internalIP):9090\033[0m"
-    echo -e "\033[32m公网地址: http://$(publicNetworkIp):9090\033[0m"
-    echo -e "\033[32m微擎面板安装成功，请访问后台设置登录密码！\033[0m"
-    echo -e ""
-    echo -e "\033[31mwarning:\033[0m"
-    echo -e "\033[33m如果您的面板无访问,\033[0m"
-    echo -e "\033[33m请确认服务器安全组是否放通 (80|443|6443|9090) 端口\033[0m"
-    echo -e "=================================================================="
+    tips "=================================================================="
+    tips "公网地址: http://$(publicNetworkIp):9090"
+    tips "内网地址: http://$(internalIP):9090"
+    tips "微擎面板安装成功，请访问后台设置登录密码！"
+    tips ""
+    warn "如果您的面板无访问："
+    warn "请确认服务器安全组是否放通 (80|443|6443|9090) 端口"
+    tips "=================================================================="
 }
 
 main "$@"
