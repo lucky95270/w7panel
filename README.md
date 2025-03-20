@@ -52,6 +52,15 @@ INSTALL_K3S_VERSION=v1.31.4+k3s1 sh install.sh
   ```bash
   PUBLIC_IP=123.123.123.123 INTERNAL_IP=123.123.123.123 sh install.sh
   ```
+  
+- 多节点集群场景下，当Server节点IP发生变更时，导致Agent节点与Server节点无法正常通信，导致部分服务启动异常时，如何排查和解决：
+  
+  1）首先输入命令`kubectl get node -o wide`，观察各个节点的ip和状态是否正确，如果节点处于NotReady说明节点状态异常。
+  
+  2）进入Agent节点服务器，找到`/etc/systemd/system/k3s-agent.service.env`文件，将`K3S_URL`中错误的Server节点IP改为正确的值，然后保存。
+  
+  3）执行命令`systemctl restart k3s-agent`，重启Agent节点上的k3s服务，等待几分钟后，异常服务即可恢复。
+  
 
 ## 核心优势
 - **生产等级**
