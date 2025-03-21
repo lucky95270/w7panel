@@ -60,7 +60,36 @@ INSTALL_K3S_VERSION=v1.31.4+k3s1 sh install.sh
   2）进入Agent节点服务器，找到`/etc/systemd/system/k3s-agent.service.env`文件，将`K3S_URL`中错误的Server节点IP改为正确的值，然后保存。
   
   3）执行命令`systemctl restart k3s-agent`，重启Agent节点上的k3s服务，等待几分钟后，异常服务即可恢复。
+
+- SELinux 阻止了 /usr/lib/systemd/systemd 对 k3s 文件的执行访问，可能会导致k3s服务启动失败：
   
+  启动失败会有如下提示：
+  
+  ```bash
+  Job for k3s-agent.service failed because the control process exited with error code.
+  See "systemctl status k3s-agent.service" and "journalctl -xeu k3s-agent.service" for details.
+  ```
+  
+  如何排查确认：
+  
+  1）执行命令`cat /var/log/messages | grep k3s`，如果有下面这种日志，可以初步确认受SELinux策略影响：
+  
+  ```bash
+  Mar 21 06:04:21 localhost systemd[1]: Starting Lightweight Kubernetes...
+  Mar 21 06:04:21 localhost sh[35860]: + /usr/bin/systemctl is-enabled --quiet nm-cloud-setup.service
+  Mar 21 06:04:21 localhost systemd[35864]: k3s-agent.service: Failed to locate executable /usr/local/bin/k3s: Permission denied
+  Mar 21 06:04:21 localhost systemd[35864]: k3s-agent.service: Failed at step EXEC spawning /usr/local/bin/k3s: Permission denied
+  Mar 21 06:04:21 localhost systemd[1]: k3s-agent.service: Main process exited, code=exited, status=203/EXEC
+  Mar 21 06:04:21 localhost systemd[1]: k3s-agent.service: Failed with result 'exit-code'.
+  Mar 21 06:04:21 localhost systemd[1]: Failed to start Lightweight Kubernetes.
+  Mar 21 06:04:21 localhost setroubleshoot[10723]: SELinux is preventing /usr/lib/systemd/systemd from execute access on the file k3s. For complete SELinux messages run: sealert -l 712cf0b8-1f9f-410b-bc85-51389a867449
+  Mar 21 06:04:21 localhost setroubleshoot[10723]: SELinux is preventing /usr/lib/systemd/systemd from execute access on the file k3s
+  ```
+
+  2）执行命令`setenforce 0`后重启k3s服务，如果是server节点执行`systemctl restart k3s.service`重启，如果是agent节点执行`systemctl restart k3s-agent.service`重启。
+
+  3）如果重启成功，那么就确认受SELinux策略影响。可以通过永久关闭SELinux来解除受限：要永久禁用 SELinux，需要编辑 SELinux 的配置文件。打开`/etc/selinux/config`文件，将`SELINUX=enforcing`改为`SELINUX=disabled`。修改完成后保存文件并重启系统，这样 SELinux 就会在系统启动时被禁用。
+
 
 ## 核心优势
 - **生产等级**
