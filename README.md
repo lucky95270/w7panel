@@ -46,6 +46,14 @@ INSTALL_K3S_VERSION=v1.31.4+k3s1 sh install.sh
   2）轻量应用服务器，可在阿里云控制台->云安全中心->功能设置->客户端，找到您的服务器后，执行卸载操作。
   
   其他问题详见阿里云官方文档：https://help.aliyun.com/zh/security-center/user-guide/uninstall-the-security-center-agent
+
+- 腾讯云服务器可能会因为安装腾讯云主机安全防护（云镜）导致占用内存，对小配置服务器有影响，可执行如下命令对该服务进行卸载：
+
+  ```bash
+  /usr/local/qcloud/YunJing/uninst.sh
+  /usr/local/qcloud/stargate/admin/uninstall.sh
+  /usr/local/qcloud/monitor/barad/admin/uninstall.sh
+  ```
   
 - 公网IP和内网IP暂时不支持IPv6，否则可能会造成网络组件安装错误，安装前请关闭IPv6，使用IPv4。也可赋值环境变量`PUBLIC_IP`（公网IP）、`INTERNAL_IP`（内网IP）来解决，示例：
   
