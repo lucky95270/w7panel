@@ -80,7 +80,7 @@ process_args() {
 show_progress() {
     local pid=$1
     local delay=0.75
-    local spinstr='|/-\'
+    local spinstr="|/-\\"
     while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
         local temp=${spinstr#?}
         printf "${WARN_COLOR} [%c]  ${NC}" "$spinstr"
@@ -98,52 +98,16 @@ download_files() {
     local save_path=$(dirname "$path")
     local filename=$(basename "$path")
     mkdir -p "$save_path" || fatal "创建目录失败: $save_path"
-    
+
     if [ -f "$path" ]; then
         info "文件已存在: ${path}"
         return 0
     fi
 
-    printf "${INFO_COLOR}[INFO]${NC} 开始下载: %s [ ] 0%%\r" "$filename"
-    (
-        stdbuf -oL curl -# -L --insecure -o "$path" "$url" 2>&1 || {
-            rm -f "$path"
-            printf "\r${ERROR_COLOR}[ERROR] 下载失败: %s${NC}" "$url"
-        }
-    ) | awk -v info_color="${INFO_COLOR}" -v success_color="${SUCCESS_COLOR}" -v nc="${NC}" -v filename="${filename}" '
-        BEGIN {
-            RS="\r"
-            max = 50
-            percent = 0
-            fflush()
-        }
-        {
-            if (match($0, /([0-9]+)\.?[0-9]*%/, parts)) {
-                new_percent = parts[1] + 0
-                if (new_percent != percent) {
-                    percent = new_percent
-                    progress = int(percent * max / 100)
-                    filled = ""
-                    for (i = 0; i < progress; i++) {
-                        filled = filled "#"
-                    }
-                    empty = ""
-                    for (i = 0; i < max - progress; i++) {
-                        empty = empty " "
-                    }
-                    printf "\r%s[INFO]%s 下载中: %s [%s%s] %d%%", info_color, nc, filename, filled, empty, percent
-                    fflush()
-                }
-            }
-        }
-        END {
-            filled = ""
-            for (i = 0; i < max; i++) {
-                filled = filled "#"
-            }
-            printf "\r%s[INFO]%s 下载完成: %s [%s] %s100%%%s\n", info_color, nc, filename, filled, success_color, nc
-        }
-    '
+    wget -q --show-progress --progress=bar:force:noscroll --no-check-certificate -c --timeout=10 --tries=20 --retry-connrefused -O "$path" "$url" || {
+        rm -f "$path"
+        fatal "下载失败: $url, 请稍后重试！"
+    }
 }
 
 # 载资源函数
@@ -326,6 +290,7 @@ k3sInstall() {
 # 系统检查
 checkDependencies() {
     command -v curl >/dev/null || fatal "请先安装 curl"
+    command -v wget >/dev/null || fatal "请先安装 wget"
     command -v ip >/dev/null || fatal "需要 iproute2 工具包"
 }
 
