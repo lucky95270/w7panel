@@ -137,7 +137,7 @@ downloadResource() {
         https://cdn.w7.cc/w7panel/manifests/w7panel-offline.yaml
         https://cdn.w7.cc/w7panel/etc/registries.yaml
         https://cdn.w7.cc/w7panel/etc/sysctl.d/k3s.conf
-        https://cdn.w7.cc/w7panel/etc/k3s.service.d/override.conf
+        https://cdn.w7.cc/w7panel/etc/systemd/k3s.service.env
     "
 
     for resource in $resources; do
@@ -207,15 +207,23 @@ etcPrivaterRegistry() {
 
 # 处理systemd配置
 etcSystemd() {
-    local ETC_PATH="/etc/systemd/system/k3s.service.d/"
-    mkdir -p "$ETC_PATH" || {
-        fatal "Failed to create directory: $ETC_PATH"
-        return 1
+    local ETC_PATH="/etc/systemd/system/"
+    if [ -f "./w7panel/etc/systemd/k3s.service.env" ]; then
+        cat "./w7panel/etc/systemd/k3s.service.env" >> "$ETC_PATH/k3s.service.env" || {
+            fatal "Failed to append content to $ETC_PATH/k3s.service.env"
+        }
+    fi
+
+    # 重新加载 systemd 管理器配置
+    systemctl daemon-reload || {
+        fatal "Failed to reload systemd manager configuration"
     }
-    cp "./w7panel/etc/k3s.service.d/override.conf" "$ETC_PATH" || {
-        fatal "Failed to copy override.conf to $ETC_PATH"
-        return 1
+
+    # 重启 k3s.service
+    systemctl restart k3s.service || {
+        fatal "Failed to restart k3s.service"
     }
+    info "k3s.service has been restarted successfully."
 }
 
 # 检查K3S是否已安装
@@ -287,19 +295,52 @@ k3sInstall() {
         --disable "local-storage,traefik"
 }
 
-# 创建Swap空间
-setupSwap() {
-    SWAP_FILE="/var/cache/private/swapfile"
-    if [ "$(swapon --show | wc -l)" -le 1 ]; then
-        info "未检测到 Swap 空间，开始创建并设置 4GB 的 Swap 空间..."
-        fallocate -l 4G "$SWAP_FILE"
-        chmod 600 "$SWAP_FILE"
-        mkswap "$SWAP_FILE"
-        swapon "$SWAP_FILE"
-        echo "$SWAP_FILE none swap defaults 0 0" | tee -a /etc/fstab
-        info "Swap 空间已成功创建并永久挂载"
+# 创建内存压缩
+setupZram() {
+    # 检测非 zram 的交换空间并删除
+    non_zram_swap=$(grep -E '^[^#].*\sswap\s' /etc/fstab | awk '!/^\/dev\/zram/ {print $1}')
+    if [ -n "$non_zram_swap" ]; then
+        info "检测到非 ZRAM 的交换空间，开始删除..."
+        for swap in $non_zram_swap; do
+            # 检查交换空间是否已挂载
+            if swapon --show | grep -q "^$swap"; then
+                swapoff "$swap"
+            fi
+            if [ -f "$swap" ]; then
+                rm "$swap"
+            fi
+            # 从 /etc/fstab 中删除对应的挂载信息
+            temp_file=$(mktemp)
+            grep -v "^$swap " /etc/fstab > "$temp_file"
+            mv "$temp_file" /etc/fstab
+        done
+        info "非 ZRAM 的交换空间已删除"
+    fi
+
+    # 检查是否已经存在 zram 设备作为交换空间
+    if ! swapon --show | grep -q '^/dev/zram'; then
+        info "未检测到 ZRAM Swap 空间，开始创建并设置 4GB 的 ZRAM Swap 空间..."
+        # 加载 zram 模块
+        modprobe zram num_devices=1
+
+        # 设置 zram 设备的压缩算法为 lz4
+        echo lz4 > /sys/block/zram0/comp_algorithm
+
+        # 设置 zram 设备的大小为 4GB
+        echo 4G > /sys/block/zram0/disksize
+
+        # 格式化 zram 设备为交换空间
+        mkswap /dev/zram0
+
+        # 启用 zram 设备作为交换空间
+        swapon /dev/zram0
+
+        # 将 zram 设备的挂载信息添加到 /etc/fstab 以实现开机自动挂载
+        echo '/dev/zram0 none swap defaults 0 0' | tee -a /etc/fstab
+
+        info "ZRAM Swap 空间已成功创建并永久挂载"
     else
-        info "已检测到 Swap 空间，跳过创建步骤"
+        info "已检测到 ZRAM Swap 空间，跳过创建步骤"
     fi
 }
 
@@ -319,12 +360,12 @@ main() {
     downloadResource
 
     etcSysctl
-    etcSystemd
     etcPrivaterRegistry
     
-    setupSwap
+    setupZram
 
     k3sInstall
+    etcSystemd
     importImages
     installHelmCharts
     checkW7panelInstalled
