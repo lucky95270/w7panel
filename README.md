@@ -98,6 +98,16 @@ INSTALL_K3S_VERSION=v1.31.4+k3s1 sh install.sh
 
   3）如果重启成功，那么就确认受SELinux策略影响。可以通过永久关闭SELinux来解除受限：要永久禁用 SELinux，需要编辑 SELinux 的配置文件。打开`/etc/selinux/config`文件，将`SELINUX=enforcing`改为`SELINUX=disabled`。修改完成后保存文件并重启系统，这样 SELinux 就会在系统启动时被禁用。
 
+- 如果安装了很多应用挤占服务器资源，导致服务器负载飙升，此时可能会造成面板无法访问的情况，如何解决这个问题：
+  
+  可以执行下面的命令先将除面板之外其他应用资源暂时实例数量设置为0，等服务器负载下降后，再进入面板处理：
+  
+  ```bash
+    kubectl get deploy,statefulset,daemonset -n default -o name | grep -v 'w7panel-offline' | xargs -I {} sh -c '
+        kubectl scale --replicas=0 {} -n default;
+        kubectl get pods -n default -o json | jq -r ".items[] | select(.metadata.ownerReferences[]?.name == \"$(echo {} | cut -d'/' -f 2)\") | .metadata.name" | xargs -r kubectl delete pods -n default
+    '
+  ```
 
 ## 核心优势
 - **生产等级**
