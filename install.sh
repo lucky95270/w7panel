@@ -272,7 +272,7 @@ installHelmCharts() {
 # 安装K3S
 k3sInstall() {
     info "current server's public network ip: $(publicNetworkIp)"
-    curl -sfL https://rancher-mirror.rancher.cn/k3s/k3s-install.sh | \
+    curl -sfL https://rancher-mirror.cdn.w7.cc/k3s/k3s-install.sh | \
     K3S_NODE_NAME=server1 K3S_KUBECONFIG_MODE='644' INSTALL_K3S_SKIP_SELINUX_RPM=true INSTALL_K3S_SELINUX_WARN=true INSTALL_K3S_MIRROR=cn INSTALL_K3S_MIRROR_URL=rancher-mirror.cdn.w7.cc \
     sh -s - --write-kubeconfig-mode 644 \
         --tls-san "$(internalIP)" \
@@ -285,6 +285,22 @@ k3sInstall() {
         --disable-network-policy \
         --disable-kube-proxy \
         --disable "local-storage,traefik"
+}
+
+# 创建Swap空间
+setupSwap() {
+    SWAP_FILE="/var/cache/private/swapfile"
+    if [ "$(swapon --show | wc -l)" -le 1 ]; then
+        info "未检测到 Swap 空间，开始创建并设置 4GB 的 Swap 空间..."
+        fallocate -l 4G "$SWAP_FILE"
+        chmod 600 "$SWAP_FILE"
+        mkswap "$SWAP_FILE"
+        swapon "$SWAP_FILE"
+        echo "$SWAP_FILE none swap defaults 0 0" | tee -a /etc/fstab
+        info "Swap 空间已成功创建并永久挂载"
+    else
+        info "已检测到 Swap 空间，跳过创建步骤"
+    fi
 }
 
 # 系统检查
@@ -305,6 +321,8 @@ main() {
     etcSysctl
     etcSystemd
     etcPrivaterRegistry
+    
+    setupSwap
 
     k3sInstall
     importImages
