@@ -99,8 +99,24 @@ INSTALL_K3S_VERSION=v1.31.4+k3s1 sh install.sh
   3）如果重启成功，那么就确认受SELinux策略影响。可以通过永久关闭SELinux来解除受限：要永久禁用 SELinux，需要编辑 SELinux 的配置文件。打开`/etc/selinux/config`文件，将`SELINUX=enforcing`改为`SELINUX=disabled`。修改完成后保存文件并重启系统，这样 SELinux 就会在系统启动时被禁用。
 
 - 如果安装了很多应用挤占服务器资源，导致服务器负载飙升，此时可能会造成面板无法访问的情况，如何解决这个问题：
+
+  1）执行`top`命令，然后输入`shift m`和`e`指令来做内存使用率筛选，示例结果：
+  ```bash
+    top - 18:57:09 up 4 days,  5:11,  6 users,  load average: 1.97, 19.75, 22.71
+    Tasks: 256 total,   1 running, 253 sleeping,   0 stopped,   2 zombie
+    %Cpu(s):  4.1 us,  3.4 sy,  0.0 ni, 92.4 id,  0.0 wa,  0.0 hi,  0.2 si,  0.0 st 
+    MiB Mem :   3595.2 total,    146.3 free,   2699.1 used,   1013.5 buff/cache     
+    MiB Swap:   4096.0 total,   3861.3 free,    234.7 used.    896.1 avail Mem 
+    
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND                                                                                                                                        
+    505819 root      20   0 2341.2m 841.4m  73.2m S   6.0  23.4     15,21 k3s-server                                                                                                                                     
+    512778 root      20   0 1470.3m 222.2m  24.6m S   1.0   6.2  33:06.60 longhorn-manage                                                                                                                                
+    520845 root      20   0 1527.5m 189.2m   8.6m S   0.0   5.3  50:42.79 victoria-metric                                                                                                                                
+    509034 root      20   0 1376.4m 132.0m  23.3m S   1.3   3.7  85:06.29 cilium-agent
+  ```
+  2）将内存较高的PID找出来（k3s-server的进程除外），然后执行`kill -9 {PID}`，将高占用的进程临时kill掉，降低负载。
   
-  可以执行下面的命令先将除面板之外其他应用资源暂时实例数量设置为0，等服务器负载下降后，再进入面板处理：
+  3）然后执行下面的命令先将除面板之外其他应用资源暂时实例数量设置为0，等服务器负载下降后，再进入面板处理：
   
   ```bash
     kubectl get deploy,statefulset,daemonset -n default -o name | grep -v 'w7panel-offline' | xargs -I {} sh -c '
