@@ -298,7 +298,7 @@ k3sInstall() {
 # 创建内存压缩
 setupZram() {
     # 检测 Swap 交换空间并删除
-    non_zram_swap=$(grep -E '^[^#].*\sswap\s' /etc/fstab)
+    non_zram_swap=$(grep -E '^[^#].*\sswap\s' /etc/fstab | awk '{print $1}')
     if [ -n "$non_zram_swap" ]; then
         info "检测到 Swap 交换空间，开始删除..."
         for swap in $non_zram_swap; do
@@ -324,13 +324,13 @@ setupZram() {
         modprobe zram num_devices=1
 
         # 设置 zram 设备的压缩算法为 lz4hc
-        echo lz4hc > /sys/block/zram0/comp_algorithm 2>/dev/null
+        echo lz4hc > /sys/block/zram0/comp_algorithm 2>/dev/null || true
 
         # 设置 zram 设备的大小为 4GB
-        echo 4G > /sys/block/zram0/disksize 2>/dev/null
+        echo 4G > /sys/block/zram0/disksize 2>/dev/null || true
 
         # 格式化 zram 设备为交换空间
-        mkswap /dev/zram0 2>/dev/null
+        mkswap /dev/zram0 2>/dev/null || true
 
         # 启用 zram 设备作为交换空间
         swapon /dev/zram0
