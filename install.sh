@@ -297,10 +297,10 @@ k3sInstall() {
 
 # 创建内存压缩
 setupZram() {
-    # 检测非 zram 的交换空间并删除
-    non_zram_swap=$(grep -E '^[^#].*\sswap\s' /etc/fstab | awk '!/^\/dev\/zram/ {print $1}')
+    # 检测 Swap 交换空间并删除
+    non_zram_swap=$(grep -E '^[^#].*\sswap\s' /etc/fstab)
     if [ -n "$non_zram_swap" ]; then
-        info "检测到非 ZRAM 的交换空间，开始删除..."
+        info "检测到 Swap 交换空间，开始删除..."
         for swap in $non_zram_swap; do
             # 检查交换空间是否已挂载
             if swapon --show | grep -q "^$swap"; then
@@ -314,7 +314,7 @@ setupZram() {
             grep -v "^$swap " /etc/fstab > "$temp_file"
             mv "$temp_file" /etc/fstab
         done
-        info "非 ZRAM 的交换空间已删除"
+        info "Swap 交换空间已删除"
     fi
 
     # 检查是否已经存在 zram 设备作为交换空间
@@ -323,26 +323,24 @@ setupZram() {
         # 加载 zram 模块
         modprobe zram num_devices=1
 
-        # 设置 zram 设备的压缩算法为 lz4
-        echo lz4 > /sys/block/zram0/comp_algorithm
+        # 设置 zram 设备的压缩算法为 lz4hc
+        echo lz4hc > /sys/block/zram0/comp_algorithm 2>/dev/null
 
         # 设置 zram 设备的大小为 4GB
-        echo 4G > /sys/block/zram0/disksize
+        echo 4G > /sys/block/zram0/disksize 2>/dev/null
 
         # 格式化 zram 设备为交换空间
-        mkswap /dev/zram0
+        mkswap /dev/zram0 2>/dev/null
 
         # 启用 zram 设备作为交换空间
         swapon /dev/zram0
 
-        # 将 zram 设备的挂载信息添加到 /etc/fstab 以实现开机自动挂载
-        echo '/dev/zram0 none swap defaults 0 0' | tee -a /etc/fstab
-
-        info "ZRAM Swap 空间已成功创建并永久挂载"
+        info "ZRAM Swap 空间已成功创建"
     else
         info "已检测到 ZRAM Swap 空间，跳过创建步骤"
     fi
 }
+
 
 # 系统检查
 checkDependencies() {
