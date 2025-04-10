@@ -350,7 +350,7 @@ setupZram() {
             fi
             # 从 /etc/fstab 中删除对应的挂载信息
             temp_file=$(mktemp)
-            grep -v "^$swap " /etc/fstab > "$temp_file"
+            awk -v swap="$swap" '$1 != swap {print}' /etc/fstab > "$temp_file"
             sudo mv "$temp_file" /etc/fstab
         done
         info "Swap 交换空间已删除"
