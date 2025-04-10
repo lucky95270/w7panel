@@ -177,16 +177,16 @@ internalIP() {
 etcSysctl() {
     if command -v sysctl &> /dev/null; then
         local ETC_PATH="/etc/sysctl.d"
-        mkdir -p "$ETC_PATH" || {
+        sudo mkdir -p "$ETC_PATH" || {
             fatal "Failed to create directory: $ETC_PATH"
             return 1
         }
-        chmod -R 755 "$ETC_PATH"
-        cp "./w7panel/etc/sysctl.d/k3s.conf" "$ETC_PATH" || {
+        sudo chmod -R 755 "$ETC_PATH"
+        sudo cp "./w7panel/etc/sysctl.d/k3s.conf" "$ETC_PATH" || {
             fatal "Failed to copy k3s.conf to $ETC_PATH"
             return 1
         }
-        sysctl -p >/dev/null 2>&1 || {
+        sudo sysctl -p >/dev/null 2>&1 || {
             warn "Failed to reload sysctl settings"
         }
     fi
@@ -195,11 +195,11 @@ etcSysctl() {
 # 处理私有仓库配置
 etcPrivaterRegistry() {
     local ETC_PATH="/etc/rancher/k3s/"
-    mkdir -p "$ETC_PATH" || {
+    sudo mkdir -p "$ETC_PATH" || {
         fatal "Failed to create directory: $ETC_PATH"
         return 1
     }
-    cp "./w7panel/etc/registries.yaml" "$ETC_PATH" || {
+    sudo cp "./w7panel/etc/registries.yaml" "$ETC_PATH" || {
         fatal "Failed to copy registries.yaml to $ETC_PATH"
         return 1
     }
@@ -209,18 +209,18 @@ etcPrivaterRegistry() {
 etcSystemd() {
     local ETC_PATH="/etc/systemd/system/"
     if [ -f "./w7panel/etc/systemd/k3s.service.env" ]; then
-        cat "./w7panel/etc/systemd/k3s.service.env" >> "$ETC_PATH/k3s.service.env" || {
+        cat "./w7panel/etc/systemd/k3s.service.env" | sudo tee -a "$ETC_PATH/k3s.service.env" > /dev/null || {
             fatal "Failed to append content to $ETC_PATH/k3s.service.env"
         }
     fi
 
     # 重新加载 systemd 管理器配置
-    systemctl daemon-reload || {
+    sudo systemctl daemon-reload || {
         fatal "Failed to reload systemd manager configuration"
     }
 
     # 重启 k3s.service
-    systemctl restart k3s.service || {
+    sudo systemctl restart k3s.service || {
         fatal "Failed to restart k3s.service"
     }
     info "k3s.service has been restarted successfully."
@@ -238,7 +238,7 @@ checkK3SInstalled() {
 
 # 检查微擎面板是否安装成功
 checkW7panelInstalled() {
-    printf "${INFO_COLOR}[INFO]${NC} %s" "正在启动微擎面板，请稍候..."
+    printf "${INFO_COLOR}[INFO]${NC} %s" "微擎面板正在初始化，预计需要3-5分钟，请耐心等待..."
     local spinpid
     while true; do
         curl -s --max-time 2 -I "http://$(internalIP):9090" | grep -q "HTTP/" && break
@@ -260,7 +260,7 @@ importImages() {
     for IMAGE_FILE in $IMAGES_DIR/*.tar; do
         count=$((count+1))
         info "导入镜像中 [$count/$total] $(basename $IMAGE_FILE)"
-        k3s ctr -n=k8s.io images import "$IMAGE_FILE" >/dev/null 2>&1 || {
+        sudo /usr/local/bin/k3s ctr -n=k8s.io images import "$IMAGE_FILE" >/dev/null 2>&1 || {
             warn "镜像导入失败: $(basename $IMAGE_FILE)"
         }
     done
@@ -270,8 +270,7 @@ importImages() {
 installHelmCharts() {
     info 'start install helm charts'
     local M_PATH="/var/lib/rancher/k3s/server/manifests/"
-    mkdir -p "$M_PATH"
-    cp -r "./w7panel/manifests/." "$M_PATH" || {
+    sudo cp -r "./w7panel/manifests/." "$M_PATH" || {
         fatal "Failed to copy manifests to $M_PATH"
         return 1
     }
@@ -295,8 +294,48 @@ k3sInstall() {
         --disable "local-storage,traefik"
 }
 
+# 检测并安装 zram 模块
+check_and_install_zram() {
+    # 先尝试加载模块
+    sudo modprobe zram num_devices=1 > /dev/null 2>&1 || true
+    
+    if ! lsmod | grep -q zram; then
+        info "未检测到 zram 内核模块，尝试安装..."
+        # 检测发行版
+        if [ -f /etc/redhat-release ]; then
+            # Red Hat 系（如 CentOS、Fedora）
+            sudo yum update -y
+            sudo yum install -y kernel-modules-extra
+        elif [ -f /etc/debian_version ]; then
+            # Debian 系（如 Ubuntu、Debian）
+            sudo apt-get update -y
+            sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::="--force-confold"
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y linux-modules-extra-$(uname -r)
+        elif [ -f /etc/arch-release ]; then
+            # Arch Linux
+            sudo pacman -Syu --noconfirm
+            sudo pacman -S --noconfirm linux-headers
+        else
+            info "无法识别的发行版，请手动安装 zram 模块"
+            return 1
+        fi
+        # 再次尝试加载模块
+        sudo modprobe zram num_devices=1
+        if [ $? -ne 0 ]; then
+            info "安装后仍无法加载 zram 模块，请手动检查"
+            return 1
+        fi
+        info "zram 模块已成功加载"
+    else
+        info "zram 内核模块已存在"
+    fi
+}
+
 # 创建内存压缩
 setupZram() {
+    # 检测并安装 zram 模块
+    check_and_install_zram || return 1
+    
     # 检测 Swap 交换空间并删除
     non_zram_swap=$(grep -E '^[^#].*\sswap\s' /etc/fstab | awk '{print $1}')
     if [ -n "$non_zram_swap" ]; then
@@ -304,7 +343,7 @@ setupZram() {
         for swap in $non_zram_swap; do
             # 检查交换空间是否已挂载
             if swapon --show | grep -q "^$swap"; then
-                swapoff "$swap"
+                sudo swapoff "$swap"
             fi
             if [ -f "$swap" ]; then
                 rm "$swap"
@@ -312,7 +351,7 @@ setupZram() {
             # 从 /etc/fstab 中删除对应的挂载信息
             temp_file=$(mktemp)
             grep -v "^$swap " /etc/fstab > "$temp_file"
-            mv "$temp_file" /etc/fstab
+            sudo mv "$temp_file" /etc/fstab
         done
         info "Swap 交换空间已删除"
     fi
@@ -321,19 +360,19 @@ setupZram() {
     if ! swapon --show | grep -q '^/dev/zram'; then
         info "未检测到 ZRAM Swap 空间，开始创建并设置 4GB 的 ZRAM Swap 空间..."
         # 加载 zram 模块
-        modprobe zram num_devices=1
+        sudo modprobe zram num_devices=1
 
         # 设置 zram 设备的压缩算法为 lz4hc
-        echo lz4hc > /sys/block/zram0/comp_algorithm 2>/dev/null || true
-
+        echo "lz4hc" | sudo tee /sys/block/zram0/comp_algorithm > /dev/null 2>&1 || true
+        
         # 设置 zram 设备的大小为 4GB
-        echo 4G > /sys/block/zram0/disksize 2>/dev/null || true
-
+        echo "4G" | sudo tee /sys/block/zram0/disksize > /dev/null 2>&1 || true
+        
         # 格式化 zram 设备为交换空间
-        mkswap /dev/zram0 2>/dev/null || true
+        sudo mkswap /dev/zram0 2>/dev/null || true
 
         # 启用 zram 设备作为交换空间
-        swapon /dev/zram0
+        sudo swapon /dev/zram0
 
         info "ZRAM Swap 空间已成功创建"
     else
@@ -361,11 +400,11 @@ main() {
     etcPrivaterRegistry
     
     setupZram
-
+    
     k3sInstall
-    etcSystemd
     importImages
     installHelmCharts
+    etcSystemd
     checkW7panelInstalled
 
     tips "=================================================================="
