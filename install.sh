@@ -346,7 +346,7 @@ setupZram() {
                 sudo swapoff "$swap"
             fi
             if [ -f "$swap" ]; then
-                rm "$swap"
+                sudo rm "$swap"
             fi
             # 从 /etc/fstab 中删除对应的挂载信息
             temp_file=$(mktemp)
