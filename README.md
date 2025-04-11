@@ -15,7 +15,7 @@
 
 ## 安装部署
 ```bash
-INSTALL_K3S_VERSION=v1.31.4+k3s1 sh install.sh
+curl -sfL https://cdn.w7.cc/w7panel/install.sh | sh -
 ```
 安装完成后，首次进入后台`http://{ip}:9090`，可设置管理员账号密码。
 
