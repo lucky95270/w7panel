@@ -186,7 +186,7 @@ etcSysctl() {
             fatal "Failed to copy k3s.conf to $ETC_PATH"
             return 1
         }
-        sudo sysctl -p >/dev/null 2>&1 || {
+        sudo sysctl --system >/dev/null 2>&1 || {
             warn "Failed to reload sysctl settings"
         }
     fi
