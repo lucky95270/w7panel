@@ -467,7 +467,6 @@ RestartSec=5s
                 else
                     warn "设置 ${service_name} 开机启动时出错"
                 fi
-                sudo systemctl start "${service_name}.service"
             else
                 fatal "创建服务文件时出错"
             fi
@@ -533,19 +532,27 @@ setupZram() {
     # 检测并安装 zram 模块
     check_and_install_zram || return 1
 
-    # 创建 ZRAM Swap Service
-    manage_systemd_service create \
-	--service-name "zram" \
-	--description "ZRAM Swap Service" \
-	--exec-start-pre "/sbin/modprobe -r zram" \
-	--exec-start-pre "/sbin/modprobe zram num_devices=1" \
-	--exec-start-pre "/bin/sh -c 'echo lz4hc > /sys/block/zram0/comp_algorithm'" \
-	--exec-start-pre "/bin/sh -c 'echo 4G > /sys/block/zram0/disksize'" \
-	--exec-start-pre "/sbin/mkswap /dev/zram0" \
-	--exec-start "/sbin/swapon -p 100 /dev/zram0" \
-	--exec-stop "/sbin/swapoff /dev/zram0" \
-	--exec-stop-post "/sbin/wipefs -a /dev/zram0" \
-	--type oneshot
+    if [ ! -f /etc/systemd/system/zram.service ]; then
+        # 创建 ZRAM Swap Service
+        manage_systemd_service create \
+        --service-name "zram" \
+        --description "ZRAM Swap Service" \
+        --exec-start-pre "/sbin/modprobe -r zram" \
+        --exec-start-pre "/sbin/modprobe zram num_devices=1" \
+        --exec-start-pre "/bin/sh -c 'echo lz4hc > /sys/block/zram0/comp_algorithm'" \
+        --exec-start-pre "/bin/sh -c 'echo 4G > /sys/block/zram0/disksize'" \
+        --exec-start-pre "/sbin/mkswap /dev/zram0" \
+        --exec-start "/sbin/swapon -p 100 /dev/zram0" \
+        --exec-stop "/sbin/swapoff /dev/zram0" \
+        --exec-stop-post "/sbin/wipefs -a /dev/zram0" \
+        --type oneshot
+
+        # 启动服务
+        sudo systemctl start zram.service
+    else
+        # 重启服务
+        sudo systemctl restart zram.service  
+    fi
 }
 
 # 系统检查
