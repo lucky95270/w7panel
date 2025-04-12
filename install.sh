@@ -294,6 +294,205 @@ k3sInstall() {
         --disable "local-storage,traefik"
 }
 
+# 启动服务管理
+manage_systemd_service() {
+    local mode="$1"
+    local service_name=""
+    local description=""
+    local exec_start_pre=""
+    local exec_start=""
+    local exec_start_post=""
+    local exec_reload=""
+    local exec_stop=""
+    local exec_stop_pre=""
+    local exec_stop_post=""
+    local environment_files=""
+    local service_type="simple"
+
+    shift
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --service-name)
+                service_name="$2"
+                shift 2
+                ;;
+            --description)
+                description="$2"
+                shift 2
+                ;;
+            --exec-start-pre)
+                if [ -n "$exec_start_pre" ]; then
+                    exec_start_pre="${exec_start_pre}\nExecStartPre=$2"
+                else
+                    exec_start_pre="ExecStartPre=$2"
+                fi
+                shift 2
+                ;;
+            --exec-start)
+                if [ -n "$exec_start" ]; then
+                    exec_start="${exec_start}\nExecStart=$2"
+                else
+                    exec_start="ExecStart=$2"
+                fi
+                shift 2
+                ;;
+            --exec-start-post)
+                if [ -n "$exec_start_post" ]; then
+                    exec_start_post="${exec_start_post}\nExecStartPost=$2"
+                else
+                    exec_start_post="ExecStartPost=$2"
+                fi
+                shift 2
+                ;;
+            --exec-reload)
+                if [ -n "$exec_reload" ]; then
+                    exec_reload="${exec_reload}\nExecReload=$2"
+                else
+                    exec_reload="ExecReload=$2"
+                fi
+                shift 2
+                ;;
+            --exec-stop)
+                if [ -n "$exec_stop" ]; then
+                    exec_stop="${exec_stop}\nExecStop=$2"
+                else
+                    exec_stop="ExecStop=$2"
+                fi
+                shift 2
+                ;;
+            --exec-stop-pre)
+                if [ -n "$exec_stop_pre" ]; then
+                    exec_stop_pre="${exec_stop_pre}\nExecStopPre=$2"
+                else
+                    exec_stop_pre="ExecStopPre=$2"
+                fi
+                shift 2
+                ;;
+            --exec-stop-post)
+                if [ -n "$exec_stop_post" ]; then
+                    exec_stop_post="${exec_stop_post}\nExecStopPost=$2"
+                else
+                    exec_stop_post="ExecStopPost=$2"
+                fi
+                shift 2
+                ;;
+            --environment-file)
+                if [ -n "$environment_files" ]; then
+                    environment_files="${environment_files}\nEnvironmentFile=-$2"
+                else
+                    environment_files="EnvironmentFile=-$2"
+                fi
+                shift 2
+                ;;
+            --type)
+                service_type="$2"
+                shift 2
+                ;;
+            *)
+                fatal "未知参数: $1"
+                ;;
+        esac
+    done
+
+    case "$mode" in
+        "create")
+            if [ -z "$service_name" ] || [ -z "$description" ] || [ -z "$exec_start" ]; then
+                fatal "缺少必要参数: --service-name, --description, --exec-start"
+            fi
+
+            service_content="[Unit]
+Description=$description
+Wants=network-online.target
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Type=$service_type
+"
+            if [ "$service_type" = "oneshot" ]; then
+                service_content="${service_content}RemainAfterExit=true
+"
+            else
+                service_content="${service_content}KillMode=process
+Delegate=yes
+TimeoutStartSec=0
+Restart=always
+RestartSec=5s
+"
+            fi
+
+            if [ -n "$environment_files" ]; then
+                service_content="${service_content}${environment_files}
+"
+            fi
+            if [ -n "$exec_start_pre" ]; then
+                service_content="${service_content}${exec_start_pre}
+"
+            fi
+            if [ -n "$exec_start" ]; then
+                service_content="${service_content}${exec_start}
+"
+            fi
+            if [ -n "$exec_start_post" ]; then
+                service_content="${service_content}${exec_start_post}
+"
+            fi
+            if [ -n "$exec_reload" ]; then
+                service_content="${service_content}${exec_reload}
+"
+            fi
+            if [ -n "$exec_stop_pre" ]; then
+                service_content="${service_content}${exec_stop_pre}
+"
+            fi
+            if [ -n "$exec_stop" ]; then
+                service_content="${service_content}${exec_stop}
+"
+            fi
+            if [ -n "$exec_stop_post" ]; then
+                service_content="${service_content}${exec_stop_post}
+"
+            fi
+
+            service_file_path="/etc/systemd/system/${service_name}.service"
+            printf "%b" "$service_content" | sudo tee "$service_file_path" > /dev/null
+            if [ $? -eq 0 ]; then
+                success "成功创建 ${service_name}.service 文件"
+                sudo systemctl daemon-reload
+                sudo systemctl enable "${service_name}.service"
+                if [ $? -eq 0 ]; then
+                    success "成功设置 ${service_name} 开机启动"
+                else
+                    warn "设置 ${service_name} 开机启动时出错"
+                fi
+                sudo systemctl start "${service_name}.service"
+            else
+                fatal "创建服务文件时出错"
+            fi
+            ;;
+        "destroy")
+            if [ -z "$service_name" ]; then
+                fatal "缺少必要参数: --service-name"
+            fi
+            service_file_path="/etc/systemd/system/${service_name}.service"
+            if [ -f "$service_file_path" ]; then
+                sudo systemctl stop "${service_name}.service"
+                sudo systemctl disable "${service_name}.service"
+                sudo rm "$service_file_path"
+                sudo systemctl daemon-reload
+                success "成功销毁 ${service_name}.service 文件"
+            else
+                warn "${service_name}.service 文件不存在"
+            fi
+            ;;
+        *)
+            fatal "未知模式: $mode。可用模式: create, destroy"
+            ;;
+    esac
+}
+
 # 检测并安装 zram 模块
 check_and_install_zram() {
     # 先尝试加载模块
@@ -316,16 +515,14 @@ check_and_install_zram() {
             sudo pacman -Syu --noconfirm
             sudo pacman -S --noconfirm linux-headers
         else
-            info "无法识别的发行版，请手动安装 zram 模块"
-            return 1
+            fatal "无法识别的发行版，请手动安装 zram 模块"
         fi
         # 再次尝试加载模块
         sudo modprobe zram num_devices=1
         if [ $? -ne 0 ]; then
-            info "安装后仍无法加载 zram 模块，请手动检查"
-            return 1
+            fatal "安装后仍无法加载 zram 模块，请手动检查"
         fi
-        info "zram 模块已成功加载"
+        success "zram 模块已成功加载"
     else
         info "zram 内核模块已存在"
     fi
@@ -335,51 +532,21 @@ check_and_install_zram() {
 setupZram() {
     # 检测并安装 zram 模块
     check_and_install_zram || return 1
-    
-    # 检测 Swap 交换空间并删除
-    non_zram_swap=$(grep -E '^[^#].*\sswap\s' /etc/fstab | awk '{print $1}')
-    if [ -n "$non_zram_swap" ]; then
-        info "检测到 Swap 交换空间，开始删除..."
-        for swap in $non_zram_swap; do
-            # 检查交换空间是否已挂载
-            if swapon --show | grep -q "^$swap"; then
-                sudo swapoff "$swap"
-            fi
-            if [ -f "$swap" ]; then
-                sudo rm "$swap"
-            fi
-            # 从 /etc/fstab 中删除对应的挂载信息
-            temp_file=$(mktemp)
-            awk -v swap="$swap" '$1 != swap {print}' /etc/fstab > "$temp_file"
-            sudo mv "$temp_file" /etc/fstab
-        done
-        info "Swap 交换空间已删除"
-    fi
 
-    # 检查是否已经存在 zram 设备作为交换空间
-    if ! swapon --show | grep -q '^/dev/zram'; then
-        info "未检测到 ZRAM Swap 空间，开始创建并设置 4GB 的 ZRAM Swap 空间..."
-        # 加载 zram 模块
-        sudo modprobe zram num_devices=1
-
-        # 设置 zram 设备的压缩算法为 lz4hc
-        echo "lz4hc" | sudo tee /sys/block/zram0/comp_algorithm > /dev/null 2>&1 || true
-        
-        # 设置 zram 设备的大小为 4GB
-        echo "4G" | sudo tee /sys/block/zram0/disksize > /dev/null 2>&1 || true
-        
-        # 格式化 zram 设备为交换空间
-        sudo mkswap /dev/zram0 2>/dev/null || true
-
-        # 启用 zram 设备作为交换空间
-        sudo swapon /dev/zram0
-
-        info "ZRAM Swap 空间已成功创建"
-    else
-        info "已检测到 ZRAM Swap 空间，跳过创建步骤"
-    fi
+    # 创建 ZRAM Swap Service
+    manage_systemd_service create \
+	--service-name "zram" \
+	--description "ZRAM Swap Service" \
+	--exec-start-pre "/sbin/modprobe -r zram" \
+	--exec-start-pre "/sbin/modprobe zram num_devices=1" \
+	--exec-start-pre "/bin/sh -c 'echo lz4hc > /sys/block/zram0/comp_algorithm'" \
+	--exec-start-pre "/bin/sh -c 'echo 4G > /sys/block/zram0/disksize'" \
+	--exec-start-pre "/sbin/mkswap /dev/zram0" \
+	--exec-start "/sbin/swapon -p 100 /dev/zram0" \
+	--exec-stop "/sbin/swapoff /dev/zram0" \
+	--exec-stop-post "/sbin/wipefs -a /dev/zram0" \
+	--type oneshot
 }
-
 
 # 系统检查
 checkDependencies() {
