@@ -539,7 +539,7 @@ setupZram() {
         --description "ZRAM Swap Service" \
         --exec-start-pre "/sbin/modprobe -r zram" \
         --exec-start-pre "/sbin/modprobe zram num_devices=1" \
-        --exec-start-pre "/bin/sh -c 'echo lz4hc > /sys/block/zram0/comp_algorithm'" \
+        --exec-start-pre "-/bin/sh -c 'echo lz4hc > /sys/block/zram0/comp_algorithm'" \
         --exec-start-pre "/bin/sh -c 'echo 4G > /sys/block/zram0/disksize'" \
         --exec-start-pre "/sbin/mkswap /dev/zram0" \
         --exec-start "/sbin/swapon -p 100 /dev/zram0" \
