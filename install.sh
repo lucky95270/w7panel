@@ -91,23 +91,48 @@ show_progress() {
     printf "    \b\b\b\b"
 }
 
-# 下载文件函数
+# 下载文件函数（带重试机制）
 download_files() {
     local url=$1
     local path=".$(echo "$url" | sed -E 's|^https?://[^/]+||')"
     local save_path=$(dirname "$path")
     local filename=$(basename "$path")
-    mkdir -p "$save_path" || fatal "创建目录失败: $save_path"
+    sudo mkdir -p "$save_path" || fatal "创建目录失败: $save_path"
 
     if [ -f "$path" ]; then
         info "文件已存在: ${path}"
         return 0
     fi
 
-    wget -q --show-progress --progress=bar:force:noscroll --no-check-certificate -c --timeout=10 --tries=20 --retry-connrefused -O "$path" "$url" || {
-        rm -f "$path"
-        fatal "下载失败: $url, 请稍后重试！"
-    }
+    # 重试配置参数
+    local max_retries=10
+    local retry_delay=5
+    local retry_count=0
+
+    while [ $retry_count -le $max_retries ]; do
+        # 最后一次重试不显示特殊提示
+        if [ $retry_count -gt 0 ]; then
+            info "正在尝试第 ${retry_count}/${max_retries} 次重试..."
+        fi
+
+        if wget -q --show-progress --progress=bar:force:noscroll --no-check-certificate \
+            -c --timeout=10 --tries=10 --retry-connrefused \
+            -O "$path" "$url"; then
+            return 0
+        fi
+
+        # 重试前清理失败的文件
+        [ -f "$path" ] && sudo rm -f "$path"
+        
+        # 未超过最大重试次数时等待
+        if [ $retry_count -lt $max_retries ]; then
+            sleep $retry_delay
+        fi
+        
+        retry_count=$((retry_count + 1))
+    done
+
+    fatal "下载失败: $url（已重试 ${max_retries} 次），请检查网络连接或稍后再试！"
 }
 
 # 载资源函数
