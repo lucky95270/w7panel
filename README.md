@@ -125,6 +125,23 @@ curl -sfL https://cdn.w7.cc/w7panel/install.sh | sh -
     '
   ```
 
+- 误删微擎面板应用后，导致 `http://{ip}:9090` 无法访问，如何解决这个问题：
+
+  1）先通过 `https://cdn.w7.cc/w7panel/manifests/w7panel-offline.yaml` 查看最新版的面板chart包地址。
+
+  2）然后登录服务器，执行helm命令重安装微擎面板，示例中以1.0.55版本为例：
+
+  ```
+  helm upgrade --install \
+  w7panel-offline \
+  https://cdn.w7.cc/w7panel/charts/w7panel-offline-1.0.55.tgz \
+  --version 1.0.55 \
+  --namespace default \
+  --atomic \
+  --set servicelb.loadBalancerClass=io.cilium/node \
+  --set servicelb.port=9090
+  ```
+
 ## 核心优势
 - **生产等级**
   
