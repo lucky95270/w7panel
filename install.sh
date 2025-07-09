@@ -145,16 +145,6 @@ downloadResource() {
         https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-controller-v1.16.2.tar
         https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-webhook-v1.16.2.tar
         https://cdn.w7.cc/w7panel/images/jetstack.cert-manager-startupapicheck-v1.16.2.tar
-        https://cdn.w7.cc/w7panel/images/longhornio.csi-attacher-v4.7.0.tar
-        https://cdn.w7.cc/w7panel/images/longhornio.csi-node-driver-registrar-v2.12.0.tar
-        https://cdn.w7.cc/w7panel/images/longhornio.csi-provisioner-v4.0.1-20241007.tar
-        https://cdn.w7.cc/w7panel/images/longhornio.csi-resizer-v1.12.0.tar
-        https://cdn.w7.cc/w7panel/images/longhornio.csi-snapshotter-v7.0.2-20241007.tar
-        https://cdn.w7.cc/w7panel/images/longhornio.livenessprobe-v2.14.0.tar
-        https://cdn.w7.cc/w7panel/images/longhornio.longhorn-engine-v1.7.2.tar
-        https://cdn.w7.cc/w7panel/images/longhornio.longhorn-instance-manager-v1.7.2.tar
-        https://cdn.w7.cc/w7panel/images/longhornio.longhorn-manager-v1.7.2.tar
-        https://cdn.w7.cc/w7panel/images/longhornio.longhorn-share-manager-v1.7.2.tar
         https://cdn.w7.cc/w7panel/manifests/cert-manager.yaml
         https://cdn.w7.cc/w7panel/manifests/cilium.yaml
         https://cdn.w7.cc/w7panel/manifests/higress.yaml
@@ -308,7 +298,6 @@ k3sInstall() {
     K3S_NODE_NAME=server1 K3S_KUBECONFIG_MODE='644' INSTALL_K3S_SKIP_SELINUX_RPM=true INSTALL_K3S_SELINUX_WARN=true INSTALL_K3S_MIRROR=cn INSTALL_K3S_MIRROR_URL=rancher-mirror.cdn.w7.cc \
     sh -s - --write-kubeconfig-mode 644 \
         --tls-san "$(internalIP)" \
-        --system-default-registry "registry.cn-hangzhou.aliyuncs.com" \
         --kubelet-arg="image-gc-high-threshold=70" \
         --kubelet-arg="image-gc-low-threshold=60" \
         --node-label "w7.public-ip=$(publicNetworkIp)" \
