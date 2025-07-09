@@ -115,7 +115,7 @@ download_files() {
             info "正在尝试第 ${retry_count}/${max_retries} 次重试..."
         fi
 
-        if wget -q --show-progress --progress=bar:force:noscroll --no-check-certificate \
+        if sudo wget -q --show-progress --progress=bar:force:noscroll --no-check-certificate \
             -c --timeout=10 --tries=10 --retry-connrefused \
             -O "$path" "$url"; then
             return 0
