@@ -572,7 +572,7 @@ setupZram() {
 # 检测multipath并配置blacklist
 checkMultipathAndBlacklist() {
     # 检查 multipath 是否安装
-    if ! command -v multipath &> /dev/null; then
+    if ! command -v multipath >/dev/null 2>&1; then
         info "未安装 multipath，跳过配置"
         return 0
     fi
