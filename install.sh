@@ -569,6 +569,49 @@ setupZram() {
     fi
 }
 
+# 检测multipath并配置blacklist
+checkMultipathAndBlacklist() {
+    # 检查 multipath 是否安装
+    if ! command -v multipath &> /dev/null; then
+        info "未安装 multipath，跳过配置"
+        return 0
+    fi
+
+    info "检测到 multipath 已安装，开始配置黑名单"
+    
+    # 确保配置目录存在
+    sudo mkdir -p /etc/multipath/conf.d
+    
+    # 黑名单配置内容（根据 longhorn 官方建议）
+    local blacklist_conf="/etc/multipath/conf.d/99-longhorn.conf"
+    local config_content=$(cat << 'EOF'
+blacklist {
+    devnode "^sd[a-z0-9]+"
+}
+EOF
+    )
+
+    # 写入配置文件
+    echo "$config_content" | sudo tee "$blacklist_conf" > /dev/null || {
+        fatal "无法写入 multipath 黑名单配置文件: $blacklist_conf"
+    }
+
+    # 重新加载配置
+    if sudo systemctl is-active --quiet multipathd; then
+        sudo systemctl reload multipathd || {
+            warn "重新加载 multipathd 服务失败，尝试重启服务"
+            sudo systemctl restart multipathd || fatal "重启 multipathd 服务失败"
+        }
+    else
+        # 如果服务未运行，尝试启动
+        sudo systemctl start multipathd || {
+            warn "启动 multipathd 服务失败，将在系统重启后生效配置"
+        }
+    fi
+
+    success "multipath 黑名单配置已完成"
+}
+
 # 系统检查
 checkDependencies() {
     command -v curl >/dev/null || fatal "请先安装 curl"
@@ -586,8 +629,9 @@ main() {
 
     etcSysctl
     etcPrivaterRegistry
-    
+
     setupZram
+    checkMultipathAndBlacklist
     
     k3sInstall
     importImages
