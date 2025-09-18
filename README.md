@@ -142,6 +142,20 @@ curl -sfL https://cdn.w7.cc/w7panel/install.sh | sh -
   --set servicelb.port=9090
   ```
 
+- 安装时卡在等待步骤很久，可能是使用非大陆地区的服务器（比如香港、新加坡、美国等地区），导致镜像拉取失败。由于微擎面板默认添加了国内的镜像源地址，如果使用非大陆地区的服务可能会导致镜像拉取速度缓慢或者拉取失败导致部分服务无法启动，如何解决这个问题：
+
+  1）登录服务器，可`ctrl + c`结束安装等待步骤（此时不会影响安装继续执行）。
+
+  2）然后找到 `/etc/rancher/k3s/registries.yaml` 文件，编辑替换为如下内如：
+
+  ```
+  mirrors:
+    registry.local.w7.cc:
+    "*":
+  ```
+
+  2）执行`systemctl restart k3s.service`重启后，等待安装即可，可使用`kuebectl get pod -A`查看pod列表是否启动完成，如果全为 Running 和 Completed 代表全部启动完成。
+
 ## 核心优势
 - **生产等级**
   
