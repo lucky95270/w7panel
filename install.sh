@@ -612,6 +612,36 @@ EOF
     success "multipath 黑名单配置已完成"
 }
 
+# 检测并处理SELinux状态
+handleSELinux() {
+    if command -v getenforce >/dev/null 2>&1; then
+        local selinux_status=$(getenforce)
+        if [ "$selinux_status" = "Enforcing" ] || [ "$selinux_status" = "Permissive" ]; then
+            info "当前SELinux状态: $selinux_status，需要关闭以避免影响k3s运行"
+            
+            # 临时关闭SELinux
+            if sudo setenforce 0 >/dev/null 2>&1; then
+                success "已临时关闭SELinux"
+            else
+                warn "临时关闭SELinux失败，将尝试永久关闭"
+            fi
+            
+            # 永久关闭SELinux
+            if [ -f /etc/selinux/config ]; then
+                sudo sed -i 's/^SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
+                sudo sed -i 's/^SELINUX=permissive/SELINUX=disabled/' /etc/selinux/config
+                success "已配置SELinux永久关闭，系统重启后生效"
+            else
+                warn "/etc/selinux/config文件不存在，无法配置永久关闭SELinux"
+            fi
+        else
+            info "SELinux已关闭，无需处理"
+        fi
+    else
+        info "未检测到SELinux管理工具，跳过处理"
+    fi
+}
+
 # 系统检查
 checkDependencies() {
     command -v curl >/dev/null || fatal "请先安装 curl"
@@ -624,6 +654,7 @@ main() {
     process_args "$@"
 
     checkDependencies
+    handleSELinux
     checkK3SInstalled
     downloadResource
 
