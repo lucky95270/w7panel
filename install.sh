@@ -642,6 +642,68 @@ handleSELinux() {
     fi
 }
 
+# 检测并处理防火墙状态
+handleFirewall() {
+    # 定义常见的防火墙服务
+    local firewalld_services=("firewalld" "ufw" "iptables" "firewalld.service" "ufw.service")
+    local firewall_active=false
+    local service_name=""
+    
+    # 检测是否有活跃的防火墙服务
+    for service in "${firewalld_services[@]}"; do
+        if command -v systemctl >/dev/null 2>&1; then
+            if systemctl is-active --quiet "$service"; then
+                firewall_active=true
+                service_name="$service"
+                break
+            fi
+        elif command -v service >/dev/null 2>&1; then
+            if service "$service" status >/dev/null 2>&1; then
+                firewall_active=true
+                service_name="$service"
+                break
+            fi
+        fi
+    done
+    
+    # 如果防火墙活跃，则进行处理
+    if [ "$firewall_active" = true ]; then
+        info "检测到活跃的防火墙服务: $service_name，需要关闭以避免影响服务运行"
+        
+        # 临时关闭防火墙
+        if command -v systemctl >/dev/null 2>&1; then
+            if sudo systemctl stop "$service_name" >/dev/null 2>&1; then
+                success "已临时关闭防火墙服务: $service_name"
+            else
+                warn "临时关闭防火墙服务 $service_name 失败，将尝试永久关闭"
+            fi
+        elif command -v service >/dev/null 2>&1; then
+            if sudo service "$service_name" stop >/dev/null 2>&1; then
+                success "已临时关闭防火墙服务: $service_name"
+            else
+                warn "临时关闭防火墙服务 $service_name 失败，将尝试永久关闭"
+            fi
+        fi
+        
+        # 永久关闭防火墙（禁止开机启动）
+        if command -v systemctl >/dev/null 2>&1; then
+            if sudo systemctl disable "$service_name" >/dev/null 2>&1; then
+                success "已配置防火墙服务 $service_name 永久关闭，系统重启后生效"
+            else
+                warn "无法配置防火墙服务 $service_name 永久关闭"
+            fi
+        elif command -v chkconfig >/dev/null 2>&1; then
+            if sudo chkconfig "$service_name" off >/dev/null 2>&1; then
+                success "已配置防火墙服务 $service_name 永久关闭，系统重启后生效"
+            else
+                warn "无法配置防火墙服务 $service_name 永久关闭"
+            fi
+        fi
+    else
+        info "未检测到活跃的防火墙服务，无需处理"
+    fi
+}
+
 # 系统检查
 checkDependencies() {
     command -v curl >/dev/null || fatal "请先安装 curl"
@@ -655,6 +717,7 @@ main() {
 
     checkDependencies
     handleSELinux
+    handleFirewall
     checkK3SInstalled
     downloadResource
 
